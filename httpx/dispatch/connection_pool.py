@@ -135,7 +135,7 @@ class ConnectionPool(AsyncDispatcher):
         else:
             await self.origin_events.wait(origin)
             connection = self.pop_connection(origin)
-            logger.trace(f"reuse_connection connection={connection!r}")
+            print(f"reuse_connection connection={connection!r}")
 
         self.active_connections.add(connection)
         return connection
@@ -153,7 +153,7 @@ class ConnectionPool(AsyncDispatcher):
             release_func=self.release_connection,
             trust_env=self.trust_env,
         )
-        logger.trace(f"new_connection connection={connection!r}")
+        print(f"new_connection connection={connection!r}")
         self.origin_events.set(origin)
         return connection
 
