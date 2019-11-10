@@ -115,9 +115,9 @@ class BasePoolSemaphore:
         raise NotImplementedError()  # pragma: no cover
 
 
-class BaseOriginEvents:
+class BaseOriginConditions:
     """
-    An data structure for async event against origins.
+    An data structure for async conditions against origins.
 
     Abstracts away any asyncio-specific interfaces.
     """
@@ -125,17 +125,20 @@ class BaseOriginEvents:
     def __init__(self) -> None:
         raise NotImplementedError()  # pragma: no cover
 
-    def get_event(self, origin: Origin) -> BaseEvent:
+    async def acquire(self, origin: Origin) -> None:
+        raise NotImplementedError()  # pragma: no cover
+
+    def release(self, origin: Origin) -> None:
         raise NotImplementedError()  # pragma: no cover
 
     async def wait(self, origin: Origin) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
-    def set(self, origin: Origin) -> None:
-        raise NotImplementedError()
+    def notify_all(self, origin: Origin) -> None:
+        raise NotImplementedError()  # pragma: no cover
 
     def __contains__(self, origin: Origin) -> bool:
-        raise NotImplementedError()
+        raise NotImplementedError()  # pragma: no cover
 
 
 class ConcurrencyBackend:
@@ -195,7 +198,7 @@ class ConcurrencyBackend:
     ) -> "BaseBackgroundManager":
         raise NotImplementedError()  # pragma: no cover
 
-    def get_origin_events(self) -> BaseOriginEvents:
+    def get_origin_events(self) -> BaseOriginConditions:
         raise NotImplementedError()  # pragma: no cover
 
 

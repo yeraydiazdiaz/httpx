@@ -103,7 +103,7 @@ class ConnectionPool(AsyncDispatcher):
 
         self.backend = AsyncioBackend() if backend is None else backend
         self.max_connections = self.backend.get_semaphore(pool_limits)
-        self.origin_events = self.backend.get_origin_events()
+        self.origin_conditions = self.backend.get_origin_conditions()
 
     @property
     def num_connections(self) -> int:
@@ -130,19 +130,21 @@ class ConnectionPool(AsyncDispatcher):
 
     async def acquire_connection(self, origin: Origin) -> HTTPConnection:
         logger.trace(f"acquire_connection origin={origin!r}")
-        if origin not in self.origin_events:
+        await self.origin_conditions.acquire(origin)
+        connection = self.pop_connection(origin)
+        if connection is None:
             connection = await self.create_connection(origin)
         else:
-            await self.origin_events.wait(origin)
+            await self.origin_conditions.wait(origin)
             connection = self.pop_connection(origin)
-            print(f"reuse_connection connection={connection!r}")
+            logger.trace(f"reuse_connection connection={connection!r}")
+        self.origin_conditions.release(origin)
 
         self.active_connections.add(connection)
         return connection
 
     async def create_connection(self, origin: Origin) -> HTTPConnection:
         await self.max_connections.acquire()
-        self.origin_events.get_event(origin)
         connection = HTTPConnection(
             origin,
             verify=self.verify,
@@ -153,8 +155,8 @@ class ConnectionPool(AsyncDispatcher):
             release_func=self.release_connection,
             trust_env=self.trust_env,
         )
-        print(f"new_connection connection={connection!r}")
-        self.origin_events.set(origin)
+        logger.trace(f"new_connection connection={connection!r}")
+        self.origin_conditions.notify_all(origin)
         return connection
 
     async def release_connection(self, connection: HTTPConnection) -> None:

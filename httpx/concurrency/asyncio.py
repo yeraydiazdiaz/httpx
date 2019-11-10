@@ -207,25 +207,28 @@ class PoolSemaphore(BasePoolSemaphore):
         self.semaphore.release()
 
 
-class OriginEvents:
+class OriginConditions:
     def __init__(self) -> None:
-        self._origin_events: typing.Dict[Origin, asyncio.Event] = {}
+        self._origin_conditions: typing.Dict[Origin, asyncio.Condition] = {}
 
-    def get_event(self, origin: Origin) -> asyncio.Event:
-        if origin not in self._origin_events:
-            self._origin_events[origin] = asyncio.Event()
-        else:
-            self._origin_events[origin].clear()
-        return self._origin_events[origin]
+    async def acquire(self, origin: Origin) -> None:
+        if origin not in self._origin_conditions:
+            print(f"creating condition for {origin}")
+            self._origin_conditions[origin] = asyncio.Condition()
+
+        await self._origin_conditions[origin].acquire()
+
+    def release(self, origin: Origin) -> None:
+        self._origin_conditions[origin].release()
 
     async def wait(self, origin: Origin) -> None:
-        await self._origin_events[origin].wait()
+        await self._origin_conditions[origin].wait()
 
-    def set(self, origin: Origin) -> None:
-        self._origin_events[origin].set()
+    def notify_all(self, origin: Origin) -> None:
+        self._origin_conditions[origin].notify_all()
 
     def __contains__(self, origin: Origin) -> bool:
-        return origin in self._origin_events
+        return origin in self._origin_conditions
 
 
 class AsyncioBackend(ConcurrencyBackend):
@@ -297,8 +300,8 @@ class AsyncioBackend(ConcurrencyBackend):
     ) -> "BackgroundManager":
         return BackgroundManager(coroutine, args)
 
-    def get_origin_events(self) -> OriginEvents:
-        return OriginEvents()
+    def get_origin_conditions(self) -> OriginConditions:
+        return OriginConditions()
 
 
 class BackgroundManager(BaseBackgroundManager):
