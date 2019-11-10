@@ -7,6 +7,7 @@ from types import TracebackType
 
 from ..config import PoolLimits, TimeoutConfig
 from ..exceptions import ConnectTimeout, PoolTimeout, ReadTimeout, WriteTimeout
+from ..models import Origin
 from .base import (
     BaseBackgroundManager,
     BaseEvent,
@@ -206,6 +207,27 @@ class PoolSemaphore(BasePoolSemaphore):
         self.semaphore.release()
 
 
+class OriginEvents:
+    def __init__(self) -> None:
+        self._origin_events: typing.Dict[Origin, asyncio.Event] = {}
+
+    def get_event(self, origin: Origin) -> asyncio.Event:
+        if origin not in self._origin_events:
+            self._origin_events[origin] = asyncio.Event()
+        else:
+            self._origin_events[origin].clear()
+        return self._origin_events[origin]
+
+    async def wait(self, origin: Origin) -> None:
+        await self._origin_events[origin].wait()
+
+    def set(self, origin: Origin) -> None:
+        self._origin_events[origin].set()
+
+    def __contains__(self, origin: Origin) -> bool:
+        return origin in self._origin_events
+
+
 class AsyncioBackend(ConcurrencyBackend):
     def __init__(self) -> None:
         global SSL_MONKEY_PATCH_APPLIED
@@ -274,6 +296,9 @@ class AsyncioBackend(ConcurrencyBackend):
         self, coroutine: typing.Callable, *args: typing.Any
     ) -> "BackgroundManager":
         return BackgroundManager(coroutine, args)
+
+    def get_origin_events(self) -> OriginEvents:
+        return OriginEvents()
 
 
 class BackgroundManager(BaseBackgroundManager):

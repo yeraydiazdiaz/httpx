@@ -3,6 +3,7 @@ import typing
 from types import TracebackType
 
 from ..config import PoolLimits, TimeoutConfig
+from ..models import Origin
 
 
 class TimeoutFlag:
@@ -114,6 +115,29 @@ class BasePoolSemaphore:
         raise NotImplementedError()  # pragma: no cover
 
 
+class BaseOriginEvents:
+    """
+    An data structure for async event against origins.
+
+    Abstracts away any asyncio-specific interfaces.
+    """
+
+    def __init__(self) -> None:
+        raise NotImplementedError()  # pragma: no cover
+
+    def get_event(self, origin: Origin) -> BaseEvent:
+        raise NotImplementedError()  # pragma: no cover
+
+    async def wait(self, origin: Origin) -> None:
+        raise NotImplementedError()
+
+    def set(self, origin: Origin) -> None:
+        raise NotImplementedError()
+
+    def __contains__(self, origin: Origin) -> bool:
+        raise NotImplementedError()
+
+
 class ConcurrencyBackend:
     async def open_tcp_stream(
         self,
@@ -169,6 +193,9 @@ class ConcurrencyBackend:
     def background_manager(
         self, coroutine: typing.Callable, *args: typing.Any
     ) -> "BaseBackgroundManager":
+        raise NotImplementedError()  # pragma: no cover
+
+    def get_origin_events(self) -> BaseOriginEvents:
         raise NotImplementedError()  # pragma: no cover
 
 

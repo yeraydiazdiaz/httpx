@@ -103,6 +103,7 @@ class ConnectionPool(AsyncDispatcher):
 
         self.backend = AsyncioBackend() if backend is None else backend
         self.max_connections = self.backend.get_semaphore(pool_limits)
+        self.origin_events = self.backend.get_origin_events()
 
     @property
     def num_connections(self) -> int:
@@ -129,26 +130,31 @@ class ConnectionPool(AsyncDispatcher):
 
     async def acquire_connection(self, origin: Origin) -> HTTPConnection:
         logger.trace(f"acquire_connection origin={origin!r}")
-        connection = self.pop_connection(origin)
-
-        if connection is None:
-            await self.max_connections.acquire()
-            connection = HTTPConnection(
-                origin,
-                verify=self.verify,
-                cert=self.cert,
-                timeout=self.timeout,
-                http_versions=self.http_versions,
-                backend=self.backend,
-                release_func=self.release_connection,
-                trust_env=self.trust_env,
-            )
-            logger.trace(f"new_connection connection={connection!r}")
+        if origin not in self.origin_events:
+            connection = await self.create_connection(origin)
         else:
+            await self.origin_events.wait(origin)
+            connection = self.pop_connection(origin)
             logger.trace(f"reuse_connection connection={connection!r}")
 
         self.active_connections.add(connection)
+        return connection
 
+    async def create_connection(self, origin: Origin) -> HTTPConnection:
+        await self.max_connections.acquire()
+        self.origin_events.get_event(origin)
+        connection = HTTPConnection(
+            origin,
+            verify=self.verify,
+            cert=self.cert,
+            timeout=self.timeout,
+            http_versions=self.http_versions,
+            backend=self.backend,
+            release_func=self.release_connection,
+            trust_env=self.trust_env,
+        )
+        logger.trace(f"new_connection connection={connection!r}")
+        self.origin_events.set(origin)
         return connection
 
     async def release_connection(self, connection: HTTPConnection) -> None:
